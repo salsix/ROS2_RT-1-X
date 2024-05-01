@@ -20,9 +20,9 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'talker = ros2_rt_1_x.publisher_member_function:main',
             'rt_target_pose = ros2_rt_1_x.rt_target_pose:main',
-            'rt1_real_inference_example = ros2_rt_1_x.models.rt1_real_inference_example:main',
+            'rt1_inference = ros2_rt_1_x.models.rt1_inference:main',
+            'image_publisher = ros2_rt_1_x.image_publisher:main'
         ],
     },
 )
