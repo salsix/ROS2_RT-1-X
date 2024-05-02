@@ -189,15 +189,13 @@ class RT1Inferer:
         seqlen=self.sequence_length,
     )
 
-    self.language_instruction = "Pick up yellow plush toy and place it on the white rectangle."
+    self.language_instruction = "Move the yaw"
     self.img_queue = deque(maxlen=15)
 
     print("RT1Inferer initialized.")
 
   def run_inference_step(self, new_image):
     """Outputs the action given observation from the env."""
-
-    print("rt1_inference.py: Running inference step...")
 
     prepared_img = preprocess_image(new_image)
 
@@ -207,12 +205,29 @@ class RT1Inferer:
     else:
       self.img_queue.append(prepared_img)
 
+    # # save all images from the queue to a folder
+    # for i, img in enumerate(self.img_queue):
+    #   img_path = f"./data/queue_img_{i}.jpg"
+    #   Image.fromarray((img * 255).astype(np.uint8)).save(img_path)
+
     language_embedding = self.embed([normalize_task_name(self.language_instruction)])[0]
 
+    img_array = np.array(self.img_queue)
+
+    # for i in img_array:
+    #   print(hash(str(i)))
+
     observation = {
-      'image': self.img_queue,
+      # 'image': np.array(img_array),
+      'image': np.random.rand(15, 300, 300, 3),
       'natural_language_embedding': np.array([language_embedding for i in range(0,15)]),
     }
+
+    # generate random observation
+    # observation = {
+    #   'image': np.random.rand(15, 300, 300, 3),
+    #   'natural_language_embedding': np.random.rand(15, 512),
+    # }
 
     return self.policy.action(observation)
 

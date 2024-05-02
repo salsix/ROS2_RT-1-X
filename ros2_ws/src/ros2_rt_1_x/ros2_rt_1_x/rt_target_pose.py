@@ -8,7 +8,6 @@ from sensor_msgs.msg import Image
 import cv_bridge
 import time
 import cv2
-from collections import deque
 
 import ros2_rt_1_x.models.rt1_inference as rt1_inference
 import ros2_rt_1_x.camera as camera
@@ -60,15 +59,18 @@ class RtTargetPose(Node):
         self.get_logger().info(f'Stored image to {filename}')
 
     def run_inference(self):
-        image = self.camera.get_picture()
-        # self.store_image(image)
-        image = cv2.cvtColor(image, cv2.COLOR_BGRA2BGR)
-        action = self.rt1_inferer.run_inference_step(image)
-        # self.get_logger().info(f'Action: {action}')
-        self.publish_target_pose(action)
-        self.run_inference()
+        while True:
+            image = self.camera.get_picture()
+            # self.store_image(image)
+            image = cv2.cvtColor(image, cv2.COLOR_BGRA2BGR)
+            action = self.rt1_inferer.run_inference_step(image)
+            # self.get_logger().info(f'Action: {action}')
+            self.publish_target_pose(action)
 
     def publish_target_pose(self, action):
+        # to see if something changed, print a hash of the action
+        print("ACTION: " + str(hash(str(action))))
+
         gripper_closedness_action = action["gripper_closedness_action"]
         rotation_delta = action["rotation_delta"]
         terminate_episode = action["terminate_episode"]
@@ -82,9 +84,8 @@ class RtTargetPose(Node):
         yaw = float(rotation_delta[2])
         grip = float(gripper_closedness_action[0])
 
-        print(f'Publishing target pose: {pos_x}, {pos_y}, {pos_z}, {roll}, {pitch}, {yaw}, {grip}')
-
-        print(type(pos_x))
+        # print(f'Publishing target pose: {pos_x}, {pos_y}, {pos_z}, {roll}, {pitch}, {yaw}, {grip}')
+        self.get_logger().info(f'Publishing target pose... {terminate_episode}')
 
         pose_msg = Pose()
         pose_msg.position.x = pos_x
