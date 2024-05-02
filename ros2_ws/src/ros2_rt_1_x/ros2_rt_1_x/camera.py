@@ -23,6 +23,8 @@ class Camera:
             self.zed.retrieve_image(self.image, sl.VIEW.LEFT)
             image_ocv = self.image.get_data()
             return image_ocv
+        print("Error: Could not grab image")
+        return None
 
     def close(self):
         self.zed.close()

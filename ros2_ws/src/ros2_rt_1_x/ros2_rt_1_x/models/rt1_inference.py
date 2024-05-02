@@ -2,9 +2,6 @@
 
 import copy
 
-from absl import app
-from absl import flags
-
 from flax.training import checkpoints
 from PIL import Image
 import jax
@@ -12,6 +9,7 @@ import jax.numpy as jnp
 import numpy as np
 import tensorflow as tf
 import tensorflow_hub as hub
+from collections import deque
 
 import ros2_rt_1_x.models.rt1 as rt1
 
@@ -146,6 +144,14 @@ def load_and_preprocess_image(image_path):
     image = np.array(image, dtype=np.float32) / 255.0  # Normalize to [0,1]
     return image
 
+def preprocess_image(image):
+    if isinstance(image, np.ndarray):
+        image = Image.fromarray(image)
+    image = image.convert('RGB')
+    image = tf.image.resize(image, (300, 300))
+    image = np.array(image, dtype=np.float32) / 255.0  # Normalize to [0,1]
+    return image
+
 # CUS: taken from tensorflow example collab
 def normalize_task_name(task_name):
 
@@ -155,58 +161,116 @@ def normalize_task_name(task_name):
                                                         ' ').replace('56', ' ')
   return replaced.lstrip(' ').rstrip(' ')
 
+class RT1Inferer:
+  """Runs inference with the RT-1 model."""
+
+  def __init__(self):
+    """Initializes the inferer."""
+    self.sequence_length = 15
+    self.num_action_tokens = 11
+    self.layer_size = 256
+    self.vocab_size = 512
+    self.num_image_tokens = 81
+    self.rt1x_model = rt1.RT1(
+        num_image_tokens=self.num_image_tokens,
+        num_action_tokens=self.num_action_tokens,
+        layer_size=self.layer_size,
+        vocab_size=self.vocab_size,
+        # Use token learner to reduce tokens per image to 81.
+        use_token_learner=True,
+        # RT-1-X uses (-2.0, 2.0) instead of (-1.0, 1.0).
+        world_vector_range=(-2.0, 2.0),
+    )
+
+    self.embed = hub.load('https://tfhub.dev/google/universal-sentence-encoder-large/5')
+
+    self.policy = RT1Policy(
+        model=self.rt1x_model,
+        seqlen=self.sequence_length,
+    )
+
+    self.language_instruction = "Pick up yellow plush toy and place it on the white rectangle."
+    self.img_queue = deque(maxlen=15)
+
+    print("RT1Inferer initialized.")
+
+  def run_inference_step(self, new_image):
+    """Outputs the action given observation from the env."""
+
+    print("rt1_inference.py: Running inference step...")
+
+    prepared_img = preprocess_image(new_image)
+
+    # if this is the first step (the queue is empty), fill all 15 places of the queue with the new image
+    if len(self.img_queue) == 0:
+      self.img_queue.extend([prepared_img for i in range(0,15)])
+    else:
+      self.img_queue.append(prepared_img)
+
+    language_embedding = self.embed([normalize_task_name(self.language_instruction)])[0]
+
+    observation = {
+      'image': self.img_queue,
+      'natural_language_embedding': np.array([language_embedding for i in range(0,15)]),
+    }
+
+    return self.policy.action(observation)
+
 
 def main():
-  sequence_length = 15
-  num_action_tokens = 11
-  layer_size = 256
-  vocab_size = 512
-  num_image_tokens = 81
-  rt1x_model = rt1.RT1(
-      num_image_tokens=num_image_tokens,
-      num_action_tokens=num_action_tokens,
-      layer_size=layer_size,
-      vocab_size=vocab_size,
-      # Use token learner to reduce tokens per image to 81.
-      use_token_learner=True,
-      # RT-1-X uses (-2.0, 2.0) instead of (-1.0, 1.0).
-      world_vector_range=(-2.0, 2.0),
-  )
-  policy = RT1Policy(
-      model=rt1x_model,
-      seqlen=sequence_length,
-  )
-
-
-  # create array of 15 images
   image_path = "./data/test.jpg"
-  images = np.array([load_and_preprocess_image(image_path) for i in range(0,15)])
-  #images = jnp.array(images)  # Convert to JAX array
+  image = Image.open(image_path)
 
-  # EMBEDDING:
-  embed = hub.load('https://tfhub.dev/google/universal-sentence-encoder-large/5')
+  inferer = RT1Inferer()
+  action = inferer.run_inference_step(image)
+  print("action: ", action)
 
-  natural_language_instruction = "Pick up yellow plush toy and place it on the white rectangle."
-  natural_language_embedding = embed([normalize_task_name(natural_language_instruction)])[0]
+  # sequence_length = 15
+  # num_action_tokens = 11
+  # layer_size = 256
+  # vocab_size = 512
+  # num_image_tokens = 81
+  # rt1x_model = rt1.RT1(
+  #     num_image_tokens=num_image_tokens,
+  #     num_action_tokens=num_action_tokens,
+  #     layer_size=layer_size,
+  #     vocab_size=vocab_size,
+  #     # Use token learner to reduce tokens per image to 81.
+  #     use_token_learner=True,
+  #     # RT-1-X uses (-2.0, 2.0) instead of (-1.0, 1.0).
+  #     world_vector_range=(-2.0, 2.0),
+  # )
+  # policy = RT1Policy(
+  #     model=rt1x_model,
+  #     seqlen=sequence_length,
+  # )
 
-  obs = {
-    'image': images,
-    #'natural_language_embedding': natural_language_embedding,
-    'natural_language_embedding': jnp.ones((15, 512)),
-  }
 
-  output_actions = policy.action(obs)
-  gripper_closedness_action = output_actions["gripper_closedness_action"]
-  rotation_delta = output_actions["rotation_delta"]
-  terminate_episode = output_actions["terminate_episode"]
-  world_vector = output_actions["world_vector"]
+  # # create array of 15 images
+  # image_path = "./data/test.jpg"
+  # images = np.array([load_and_preprocess_image(image_path) for i in range(0,15)])
 
-  print("gripper_closedness_action: ", gripper_closedness_action)
-  print("rotation_delta: ", rotation_delta)
-  print("terminate_episode: ", terminate_episode)
-  print("world_vector: ", world_vector)
+  # #images = jnp.array(images)  # Convert to JAX array
 
+  # # EMBEDDING:
+  # embed = hub.load('https://tfhub.dev/google/universal-sentence-encoder-large/5')
 
+  # natural_language_instruction = "Pick up yellow plush toy and place it on the white rectangle."
+  # natural_language_embedding = embed([normalize_task_name(natural_language_instruction)])[0].numpy()
 
-if __name__ == '__main__':
-  app.run(main)
+  # obs = {
+  #   'image': images,
+  #   'natural_language_embedding': np.array([natural_language_embedding for i in range(0,15)]),
+  #   # 'natural_language_embedding': jnp.ones((15, 512)),
+  # }
+
+  # output_actions = policy.action(obs)
+  # gripper_closedness_action = output_actions["gripper_closedness_action"]
+  # rotation_delta = output_actions["rotation_delta"]
+  # terminate_episode = output_actions["terminate_episode"]
+  # world_vector = output_actions["world_vector"]
+
+  # print("gripper_closedness_action: ", gripper_closedness_action)
+  # print("rotation_delta: ", rotation_delta)
+  # print("terminate_episode: ", terminate_episode)
+  # print("world_vector: ", world_vector)
