@@ -189,7 +189,7 @@ class RT1Inferer:
         seqlen=self.sequence_length,
     )
 
-    self.language_instruction = "Move the yaw"
+    self.language_instruction = "Pick up the yellow plush toy."
     self.img_queue = deque(maxlen=15)
 
     print("RT1Inferer initialized.")
@@ -217,9 +217,14 @@ class RT1Inferer:
     # for i in img_array:
     #   print(hash(str(i)))
 
+    # save all images from the queue to a folder
+    # for i, img in enumerate(img_array):
+    #   img_path = f"./data/queue_img_{i}.jpg"
+    #   Image.fromarray((img * 255).astype(np.uint8)).save(img_path)
+
     observation = {
-      # 'image': np.array(img_array),
-      'image': np.random.rand(15, 300, 300, 3),
+      'image': np.array(img_array),
+      # 'image': np.random.rand(15, 300, 300, 3),
       'natural_language_embedding': np.array([language_embedding for i in range(0,15)]),
     }
 

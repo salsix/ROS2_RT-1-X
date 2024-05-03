@@ -62,9 +62,9 @@ class RtTargetPose(Node):
         while True:
             image = self.camera.get_picture()
             # self.store_image(image)
-            image = cv2.cvtColor(image, cv2.COLOR_BGRA2BGR)
+            image = cv2.cvtColor(image, cv2.COLOR_BGRA2RGB)
             action = self.rt1_inferer.run_inference_step(image)
-            # self.get_logger().info(f'Action: {action}')
+            self.get_logger().info(f'Action: {action}')
             self.publish_target_pose(action)
 
     def publish_target_pose(self, action):
