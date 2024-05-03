@@ -152,15 +152,6 @@ def preprocess_image(image):
     image = np.array(image, dtype=np.float32) / 255.0  # Normalize to [0,1]
     return image
 
-# CUS: taken from tensorflow example collab
-def normalize_task_name(task_name):
-
-  replaced = task_name.replace('_', ' ').replace('1f', ' ').replace(
-      '4f', ' ').replace('-', ' ').replace('50',
-                                           ' ').replace('55',
-                                                        ' ').replace('56', ' ')
-  return replaced.lstrip(' ').rstrip(' ')
-
 class RT1Inferer:
   """Runs inference with the RT-1 model."""
 
@@ -210,7 +201,7 @@ class RT1Inferer:
     #   img_path = f"./data/queue_img_{i}.jpg"
     #   Image.fromarray((img * 255).astype(np.uint8)).save(img_path)
 
-    language_embedding = self.embed([normalize_task_name(self.language_instruction)])[0]
+    language_embedding = self.embed([self.language_instruction])[0]
 
     img_array = np.array(self.img_queue)
 
@@ -223,9 +214,11 @@ class RT1Inferer:
     #   Image.fromarray((img * 255).astype(np.uint8)).save(img_path)
 
     observation = {
-      'image': np.array(img_array),
+      'image': img_array,
       # 'image': np.random.rand(15, 300, 300, 3),
       'natural_language_embedding': np.array([language_embedding for i in range(0,15)]),
+      # 'natural_language_embedding': np.random.rand(15, 512),
+      # 'natural_language_embedding': np.ones((15, 512)),
     }
 
     # generate random observation

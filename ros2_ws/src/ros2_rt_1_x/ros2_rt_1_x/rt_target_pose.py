@@ -99,8 +99,8 @@ class RtTargetPose(Node):
         grip_msg = Float32()
         grip_msg.data = grip
 
-        self.pose_publisher.publish(pose_msg)
-        self.grip_publisher.publish(grip_msg)
+        # self.pose_publisher.publish(pose_msg)
+        # self.grip_publisher.publish(grip_msg)
 
         self.get_logger().info('Published target pose and grip.')
 
