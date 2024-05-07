@@ -11,6 +11,7 @@ import cv2
 
 import ros2_rt_1_x.models.rt1_inference as rt1_inference
 import ros2_rt_1_x.camera as camera
+import ros2_ws.src.ros2_rt_1_x.ros2_rt_1_x.tf_models.tf_rt1_inference as tf_models
 
 
 class RtTargetPose(Node):
@@ -25,8 +26,10 @@ class RtTargetPose(Node):
         # listener for input images
         self.subscription = self.create_subscription(Image, 'rt_input_image', self.image_listener_callback, 10)
 
-        self.rt1_inferer = rt1_inference.RT1Inferer()
-        self.camera = camera.Camera()
+        # self.rt1_inferer = rt1_inference.RT1Inferer()
+        # self.camera = camera.Camera()
+
+        self.rt1_tf_inferer = tf_models.RT1TensorflowInferer()
 
         self.run_inference()
 
@@ -60,12 +63,17 @@ class RtTargetPose(Node):
 
     def run_inference(self):
         while True:
-            image = self.camera.get_picture()
-            # self.store_image(image)
-            image = cv2.cvtColor(image, cv2.COLOR_BGRA2RGB)
-            action = self.rt1_inferer.run_inference_step(image)
-            self.get_logger().info(f'Action: {action}')
-            self.publish_target_pose(action)
+            # image = self.camera.get_picture()
+            # # self.store_image(image)
+            # image = cv2.cvtColor(image, cv2.COLOR_BGRA2RGB)
+            # action = self.rt1_inferer.run_inference_step(image)
+            # self.get_logger().info(f'Action: {action}')
+            # self.publish_target_pose(action)
+            act = self.rt1_tf_inferer.run_inference()
+            self.publish_target_pose(act)
+            time.sleep(0.3)
+
+
 
     def publish_target_pose(self, action):
         # to see if something changed, print a hash of the action
@@ -99,8 +107,8 @@ class RtTargetPose(Node):
         grip_msg = Float32()
         grip_msg.data = grip
 
-        # self.pose_publisher.publish(pose_msg)
-        # self.grip_publisher.publish(grip_msg)
+        self.pose_publisher.publish(pose_msg)
+        self.grip_publisher.publish(grip_msg)
 
         self.get_logger().info('Published target pose and grip.')
 
