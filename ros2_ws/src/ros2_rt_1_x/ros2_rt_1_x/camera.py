@@ -20,7 +20,7 @@ class Camera:
 
     def get_picture(self):
         if self.zed.grab() == sl.ERROR_CODE.SUCCESS:
-            self.zed.retrieve_image(self.image, sl.VIEW.LEFT)
+            self.zed.retrieve_image(self.image, sl.VIEW.RIGHT)
             image_ocv = self.image.get_data()
             return image_ocv
         print("Error: Could not grab image")

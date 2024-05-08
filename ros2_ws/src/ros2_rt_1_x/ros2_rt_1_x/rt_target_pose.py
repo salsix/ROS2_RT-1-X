@@ -11,7 +11,7 @@ import cv2
 
 import ros2_rt_1_x.models.rt1_inference as rt1_inference
 import ros2_rt_1_x.camera as camera
-import ros2_ws.src.ros2_rt_1_x.ros2_rt_1_x.tf_models.tf_rt1_inference as tf_models
+import ros2_rt_1_x.tf_models.tf_rt1_inference as tf_models
 
 
 class RtTargetPose(Node):
@@ -77,7 +77,7 @@ class RtTargetPose(Node):
 
     def publish_target_pose(self, action):
         # to see if something changed, print a hash of the action
-        print("ACTION: " + str(hash(str(action))))
+        # print("ACTION: " + str(hash(str(action))))
 
         gripper_closedness_action = action["gripper_closedness_action"]
         rotation_delta = action["rotation_delta"]
@@ -93,7 +93,8 @@ class RtTargetPose(Node):
         grip = float(gripper_closedness_action[0])
 
         # print(f'Publishing target pose: {pos_x}, {pos_y}, {pos_z}, {roll}, {pitch}, {yaw}, {grip}')
-        self.get_logger().info(f'Publishing target pose... {terminate_episode}')
+        self.get_logger().info(f'Publishing target pose and grip...')
+        # self.get_logger().info(f'pos_x: {pos_x}, pos_y: {pos_y}, pos_z: {pos_z}, roll: {roll}, pitch: {pitch}, yaw: {yaw}, grip: {grip}')
 
         pose_msg = Pose()
         pose_msg.position.x = pos_x
@@ -109,8 +110,6 @@ class RtTargetPose(Node):
 
         self.pose_publisher.publish(pose_msg)
         self.grip_publisher.publish(grip_msg)
-
-        self.get_logger().info('Published target pose and grip.')
 
 def main(args=None):
     rclpy.init(args=args)

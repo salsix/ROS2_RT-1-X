@@ -30,13 +30,19 @@ class RT1TensorflowInferer:
 
         self.policy_state = self.tfa_policy.get_initial_state(batch_size=1)
 
-        self.natural_language_instruction = "Put the banana in the pan."
+        self.natural_language_instruction = "Pick up the black and white football."
         self.natural_language_embedding = self.embed([self.natural_language_instruction])[0]
 
         self.cam = camera.Camera()
 
     def run_inference(self):
-        image = resize(Image.fromarray(self.cam.get_picture()).convert('RGB'))
+        image = Image.fromarray(self.cam.get_picture()).convert('RGB')
+        
+        # save image for debugging
+        image.save(f'./data/tf_rt1_inference.jpg')
+
+        image = resize(image)
+
 
         self.observation['image'] = image
         self.observation['natural_language_embedding'] = self.natural_language_embedding
@@ -69,23 +75,34 @@ def rescale_for_umi(action):
     yaw = float(rotation_delta[2])
     grip = float(gripper_closedness_action[0])
 
-    abs_pos = 0.05
+    print('BEFORE SCALE')
+    print(f'pos_x: {pos_x}, pos_y: {pos_y}, pos_z: {pos_z}')
+    print(f'roll: {roll}, pitch: {pitch}, yaw: {yaw}, grip: {grip}')
+    print(f'gr: {gripper_closedness_action}')
+    print(f'terminate: {terminate_episode}')
+
+    # write to csv
+    with open('./data/output_csv', 'a') as f:
+        f.write(f'{pos_x},{pos_y},{pos_z},{roll},{pitch},{yaw},{grip}\n')
+
+    abs_pos = 0.5
     abs_rot = 0.25
 
-    umi_pos_x = rescale_dimension(pos_x, -abs_pos, abs_pos, -0.06, 0.06)
-    umi_pos_y = rescale_dimension(pos_y, -abs_pos, abs_pos, 0.2, 0.7)
+    umi_pos_x = rescale_dimension(pos_x, -abs_pos, abs_pos, -0.6, 0.6)
+    umi_pos_y = rescale_dimension(pos_y, -abs_pos, abs_pos, 0.3, 0.8)
     umi_pos_z = rescale_dimension(pos_z, -abs_pos, abs_pos, 0.1, 0.7)
     umi_roll = rescale_dimension(roll, -abs_rot, abs_rot, 0.0, 90.0)
     umi_pitch = rescale_dimension(pitch, -abs_rot, abs_rot, 0.0, 90.0)
     umi_yaw = rescale_dimension(yaw, -abs_rot, abs_rot, -20.0, 200.0)
-    umi_grip = rescale_dimension(grip, -0.05, 0.05, 0.02, 0.08)
+    umi_grip = rescale_dimension(grip, -1, 1, 0.02, 0.08)
+
+    # print(f'2. pos_x: {umi_pos_x}, pos_y: {umi_pos_y}, pos_z: {umi_pos_z}')
 
     action["world_vector"] = [umi_pos_x, umi_pos_y, umi_pos_z]
     action["rotation_delta"] = [umi_roll, umi_pitch, umi_yaw]
     action["gripper_closedness_action"] = [umi_grip]
 
     return action
-
 
 def rescale_dimension(
     value: float,
@@ -94,7 +111,20 @@ def rescale_dimension(
     post_scaling_min: float = -1.0,
     post_scaling_max: float = 1.0,
 ) -> float:
-  """Formula taken from https://stats.stackexchange.com/questions/281162/scale-a-number-between-a-range."""
-  return (value - low) / (high - low) * (
-      post_scaling_max - post_scaling_min
-  ) + post_scaling_min
+    """Formula taken from https://stats.stackexchange.com/questions/281162/scale-a-number-between-a-range."""
+    if value < low:
+        print(f"VALUE BELOW LOW: {value} < {low}")
+    if value > high:
+        print(f"VALUE ABOVE HIGH: {value} > {high}")
+
+    # val = value
+    val = (value - low) / (high - low) * (
+        post_scaling_max - post_scaling_min
+    ) + post_scaling_min
+    if val < post_scaling_min:
+        print("VALUE BELOW MIN")
+        return post_scaling_min
+    if val > post_scaling_max:
+        print("VALUE ABOVE MAX")
+        return post_scaling_max
+    return val
