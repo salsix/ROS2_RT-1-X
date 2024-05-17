@@ -12,10 +12,11 @@ import tensorflow_hub as hub
 
 import ros2_rt_1_x.camera as camera
 import time
+import cv2
 
 class RT1TensorflowInferer:
   
-    def __init__(self):
+    def __init__(self, natural_language_instruction: str):
         saved_model_path = './checkpoints/rt_1_x_tf_trained_for_002272480_step'
 
         self.tfa_policy = py_tf_eager_policy.SavedModelPyTFEagerPolicy(
@@ -30,23 +31,35 @@ class RT1TensorflowInferer:
 
         self.policy_state = self.tfa_policy.get_initial_state(batch_size=1)
 
-        self.natural_language_instruction = "Pick up the black and white football."
+        self.natural_language_instruction = natural_language_instruction
         self.natural_language_embedding = self.embed([self.natural_language_instruction])[0]
 
         self.cam = camera.Camera()
 
-    def run_inference(self):
-        image = Image.fromarray(self.cam.get_picture()).convert('RGB')
+    def run_inference(self,i):
+        image = Image.fromarray(cv2.cvtColor(self.cam.get_picture(), cv2.COLOR_BGRA2RGB)).convert('RGB')
         
         # save image for debugging
         image.save(f'./data/tf_rt1_inference.jpg')
 
         image = resize(image)
+        # write image data to text file
+        # np.set_printoptions(threshold=np.inf)
+        # with open('./data/output_img', 'w') as f:
+        #     f.write(str(type(image.numpy())))
+        #     f.write(str(image.numpy()))
+
+
+        # array of 15 of the same image
+        # image = tf.convert_to_tensor(np.array([np.array(image) for _ in range(15)]))
+
+        image = resize(Image.open(f'/home/jonathan/Thesis/open_x_embodiment/imgs/bridge/{i}.png').convert('RGB'))
+        image = tf.convert_to_tensor(np.array(image))
 
 
         self.observation['image'] = image
         self.observation['natural_language_embedding'] = self.natural_language_embedding
-        self.observation['natural_language_instruction'] = self.natural_language_instruction
+        # self.observation['natural_language_instruction'] = self.natural_language_instruction
 
         tfa_time_step = ts.transition(self.observation, reward=np.zeros((), dtype=np.float32))
 
@@ -85,8 +98,8 @@ def rescale_for_umi(action):
     with open('./data/output_csv', 'a') as f:
         f.write(f'{pos_x},{pos_y},{pos_z},{roll},{pitch},{yaw},{grip}\n')
 
-    abs_pos = 0.5
-    abs_rot = 0.25
+    abs_pos = 2
+    abs_rot = np.pi
 
     umi_pos_x = rescale_dimension(pos_x, -abs_pos, abs_pos, -0.6, 0.6)
     umi_pos_y = rescale_dimension(pos_y, -abs_pos, abs_pos, 0.3, 0.8)
