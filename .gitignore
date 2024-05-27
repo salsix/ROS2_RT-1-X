@@ -3,4 +3,5 @@ build/
 install/
 log/
 checkpoints/
-ros2_ws/data/
+ros2_ws/data/*
+!ros2_ws/data/plots/

@@ -40,7 +40,8 @@ class RT1TensorflowInferer:
         image = Image.fromarray(cv2.cvtColor(self.cam.get_picture(), cv2.COLOR_BGRA2RGB)).convert('RGB')
         
         # save image for debugging
-        image.save(f'./data/tf_rt1_inference.jpg')
+        if i == 0:
+            image.save(f'./data/tmp_inference.png')
 
         image = resize(image)
         # write image data to text file
@@ -53,8 +54,8 @@ class RT1TensorflowInferer:
         # array of 15 of the same image
         # image = tf.convert_to_tensor(np.array([np.array(image) for _ in range(15)]))
 
-        image = resize(Image.open(f'/home/jonathan/Thesis/open_x_embodiment/imgs/bridge/{i}.png').convert('RGB'))
-        image = tf.convert_to_tensor(np.array(image))
+        # image = resize(Image.open(f'/home/jonathan/Thesis/open_x_embodiment/imgs/bridge/{i}.png').convert('RGB'))
+        # image = tf.convert_to_tensor(np.array(image))
 
 
         self.observation['image'] = image
@@ -98,16 +99,24 @@ def rescale_for_umi(action):
     with open('./data/output_csv', 'a') as f:
         f.write(f'{pos_x},{pos_y},{pos_z},{roll},{pitch},{yaw},{grip}\n')
 
-    abs_pos = 2
+    abs_pos = 2.0
     abs_rot = np.pi
 
+    # umi_pos_x = rescale_dimension(pos_x, -abs_pos, abs_pos, -0.6, 0.6)
+    # umi_pos_y = rescale_dimension(pos_y, -abs_pos, abs_pos, 0.3, 0.8)
+    # umi_pos_z = rescale_dimension(pos_z, -abs_pos, abs_pos, 0.1, 0.7)
+    # umi_roll = rescale_dimension(roll, -abs_rot, abs_rot, 0.0, 90.0)
+    # umi_pitch = rescale_dimension(pitch, -abs_rot, abs_rot, 0.0, 90.0)
+    # umi_yaw = rescale_dimension(yaw, -abs_rot, abs_rot, -20.0, 200.0)
+    # umi_grip = rescale_dimension(grip, -1, 1, 0.02, 0.08)
+
     umi_pos_x = rescale_dimension(pos_x, -abs_pos, abs_pos, -0.6, 0.6)
-    umi_pos_y = rescale_dimension(pos_y, -abs_pos, abs_pos, 0.3, 0.8)
-    umi_pos_z = rescale_dimension(pos_z, -abs_pos, abs_pos, 0.1, 0.7)
-    umi_roll = rescale_dimension(roll, -abs_rot, abs_rot, 0.0, 90.0)
-    umi_pitch = rescale_dimension(pitch, -abs_rot, abs_rot, 0.0, 90.0)
-    umi_yaw = rescale_dimension(yaw, -abs_rot, abs_rot, -20.0, 200.0)
-    umi_grip = rescale_dimension(grip, -1, 1, 0.02, 0.08)
+    umi_pos_y = rescale_dimension(pos_y, -abs_pos, abs_pos, -0.25, 0.25) # 0.5
+    umi_pos_z = rescale_dimension(pos_z, -abs_pos, abs_pos, -0.3, 0.3) # 0.6
+    umi_roll = rescale_dimension(roll, -abs_rot, abs_rot, -45.0, 45.0) # 90
+    umi_pitch = rescale_dimension(pitch, -abs_rot, abs_rot, -45.0, 45.0) # 90
+    umi_yaw = rescale_dimension(yaw, -abs_rot, abs_rot, -80.0, 80.0) # 220
+    umi_grip = rescale_dimension(grip, -1, 1, -0.03, 0.03) # 0.06
 
     # print(f'2. pos_x: {umi_pos_x}, pos_y: {umi_pos_y}, pos_z: {umi_pos_z}')
 
