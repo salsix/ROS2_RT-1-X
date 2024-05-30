@@ -10,6 +10,7 @@ class Camera:
 
         self.err = self.zed.open(self.init_params)
         if self.err != sl.ERROR_CODE.SUCCESS:
+            print(repr(self.err))
             exit(1)
 
         # Create an Image object to store the captured image

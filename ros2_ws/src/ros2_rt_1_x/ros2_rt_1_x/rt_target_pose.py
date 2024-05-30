@@ -9,8 +9,11 @@ import cv_bridge
 import time
 import cv2
 import matplotlib.pyplot as plt
+import numpy as np
+import PIL 
+import tensorflow as tf
 
-import ros2_rt_1_x.models.rt1_inference as rt1_inference
+import ros2_rt_1_x.models.rt1_inference as jax_models
 import ros2_rt_1_x.camera as camera
 import ros2_rt_1_x.tf_models.tf_rt1_inference as tf_models
 
@@ -18,6 +21,9 @@ import ros2_rt_1_x.tf_models.tf_rt1_inference as tf_models
 class RtTargetPose(Node):
 
     def __init__(self):
+
+        tf.config.experimental.set_visible_devices([], "GPU")
+
         super().__init__('rt_target_pose_publisher')
         self.img_converter = cv_bridge.CvBridge()
 
@@ -28,12 +34,13 @@ class RtTargetPose(Node):
         self.subscription = self.create_subscription(Image, 'rt_input_image', self.image_listener_callback, 10)
 
         # self.rt1_inferer = rt1_inference.RT1Inferer()
-        # self.camera = camera.Camera()
+        self.camera = camera.Camera()
 
-        self.natural_language_instruction = "Pick up the green cucumber."
-        self.rt1_tf_inferer = tf_models.RT1TensorflowInferer(self.natural_language_instruction)
+        self.natural_language_instruction = "Place the can to the left of the pot."
+        # self.rt1_tf_inferer = tf_models.RT1TensorflowInferer(self.natural_language_instruction)
+        self.rt1_jax_inferer = jax_models.RT1Inferer(self.natural_language_instruction)
 
-        self.inference_interval = 5
+        self.inference_interval = 2
 
         self.cur_x = 0.0
         self.cur_y = 0.5
@@ -44,6 +51,8 @@ class RtTargetPose(Node):
         self.cur_grip = 0.02
 
         self.pose_history = []
+
+        # self.camera = camera.Camera()
 
         self.run_inference()
 
@@ -70,21 +79,31 @@ class RtTargetPose(Node):
         actions = []
         steps = 0
         while steps < 38:
-            # image = self.camera.get_picture()
+            image = self.camera.get_picture()
+
+            image = PIL.Image.open(f'/home/jonathan/Thesis/open_x_embodiment/imgs/bridge/{steps+1}.png')
+
             # # self.store_image(image)
             # image = cv2.cvtColor(image, cv2.COLOR_BGRA2RGB)
             # action = self.rt1_inferer.run_inference_step(image)
             # self.get_logger().info(f'Action: {action}')
             # self.publish_target_pose(action)
-            act = self.rt1_tf_inferer.run_inference(steps)
+
+            # act = self.rt1_tf_inferer.run_inference(steps)
+            act = self.rt1_jax_inferer.run_inference(image,steps)
+
             self.publish_target_pose_deltas(act)
             actions.append(act)
-            time.sleep(self.inference_interval)
+
+            print(hash(str(act)))
+
+            # time.sleep(self.inference_interval)
             steps += 1
             print(f'Step {steps} done.')
         print('DONE RUNNING INFERENCE.')
         # self.draw_plots(actions)
-        self.draw_pose_history_plots()
+        # self.draw_pose_history_plots()
+        self.draw_bridge_example_plots(actions)
 
     def draw_plots(self, actions):
         fig, axs = plt.subplots(3, 3)
@@ -190,6 +209,67 @@ class RtTargetPose(Node):
             f.write('X,Y,Z,Roll,Pitch,Yaw,Gripper\n')
             for a in self.pose_history:
                 f.write(f'{a[0]},{a[1]},{a[2]},{a[3]},{a[4]},{a[5]},{a[6]}\n')
+
+        # draw heatmap
+        
+        # get all x and y values
+        x = [a[0] for a in self.pose_history]
+        y = [a[1] for a in self.pose_history]
+
+        # create heatmap
+        # Create a 2D histogram (heatmap)
+        heatmap, xedges, yedges = np.histogram2d(x, y, bins=(50, 50))
+
+        # Plot the heatmap
+        plt.figure(figsize=(8, 6))
+        plt.imshow(heatmap.T, origin='lower', cmap='hot', interpolation='nearest')
+        plt.colorbar(label='Density')
+        plt.title('Heatmap of 2D Coordinates')
+        plt.xlabel('X Coordinate')
+        plt.ylabel('Y Coordinate')
+
+        # Save the heatmap as a PNG file
+        plt.savefig('heatmap.png')
+
+        # Show the plot (optional)
+
+    def draw_bridge_example_plots(self, act):
+        # show the raw model output
+        data = act
+
+        fig, axs = plt.subplots(1, 10)
+
+        fig.set_size_inches([45, 5])
+        fig.subplots_adjust(left=0.03, right=0.97)
+
+        print(data)
+
+        axs[0].plot([a['terminate_episode'][0] for a in data], color='red')
+        axs[0].set_title('terminate_episode_0')
+        axs[1].plot([a['terminate_episode'][1] for a in data], color='red')
+        axs[1].set_title('terminate_episode_1')
+        axs[2].plot([a['terminate_episode'][2] for a in data], color='red')
+        axs[2].set_title('terminate_episode_2')
+        axs[3].plot([a['world_vector'][0] for a in data], color='red')
+        axs[3].set_title('world_vector_0')
+        axs[4].plot([a['world_vector'][1] for a in data], color='red')
+        axs[4].set_title('world_vector_1')
+        axs[5].plot([a['world_vector'][2] for a in data], color='red')
+        axs[5].set_title('world_vector_2')
+        axs[6].plot([a['rotation_delta'][0] for a in data], color='red')
+        axs[6].set_title('rotation_delta_0')
+        axs[7].plot([a['rotation_delta'][1] for a in data], color='red')
+        axs[7].set_title('rotation_delta_1')
+        axs[8].plot([a['rotation_delta'][2] for a in data], color='red')
+        axs[8].set_title('rotation_delta_2')
+        axs[9].plot([a['gripper_closedness_action'][0] for a in data], color='red')
+        axs[9].set_title('gripper_closedness_action_0')
+
+        filename = f'inference_raw_{int(time.time())}'
+
+        # plt.subplots_adjust(wspace=0.3, hspace=0.5)
+        fig.savefig(f'./data/plots/{filename}.png')
+
 
 
     def publish_target_pose(self, action):
