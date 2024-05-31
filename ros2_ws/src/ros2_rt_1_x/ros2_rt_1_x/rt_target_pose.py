@@ -34,11 +34,11 @@ class RtTargetPose(Node):
         self.subscription = self.create_subscription(Image, 'rt_input_image', self.image_listener_callback, 10)
 
         # self.rt1_inferer = rt1_inference.RT1Inferer()
-        self.camera = camera.Camera()
+        # self.camera = camera.Camera()
 
-        self.natural_language_instruction = "Place the can to the left of the pot."
-        # self.rt1_tf_inferer = tf_models.RT1TensorflowInferer(self.natural_language_instruction)
-        self.rt1_jax_inferer = jax_models.RT1Inferer(self.natural_language_instruction)
+        self.natural_language_instruction = "Place the yellow banana in the pan."
+        self.rt1_tf_inferer = tf_models.RT1TensorflowInferer(self.natural_language_instruction)
+        # self.rt1_jax_inferer = jax_models.RT1Inferer(self.natural_language_instruction)
 
         self.inference_interval = 2
 
@@ -53,6 +53,8 @@ class RtTargetPose(Node):
         self.pose_history = []
 
         # self.camera = camera.Camera()
+
+        self.logfile_name_base = f'inf_{int(time.time())}'
 
         self.run_inference()
 
@@ -78,10 +80,9 @@ class RtTargetPose(Node):
         print('TOOK ON INIT POSE. RUNNING INFERENCE...')
         actions = []
         steps = 0
-        while steps < 38:
-            image = self.camera.get_picture()
+        while steps < 70:
 
-            image = PIL.Image.open(f'/home/jonathan/Thesis/open_x_embodiment/imgs/bridge/{steps+1}.png')
+            # image = PIL.Image.open(f'/home/jonathan/Thesis/open_x_embodiment/imgs/bridge/{steps+1}.png')
 
             # # self.store_image(image)
             # image = cv2.cvtColor(image, cv2.COLOR_BGRA2RGB)
@@ -89,20 +90,22 @@ class RtTargetPose(Node):
             # self.get_logger().info(f'Action: {action}')
             # self.publish_target_pose(action)
 
-            # act = self.rt1_tf_inferer.run_inference(steps)
-            act = self.rt1_jax_inferer.run_inference(image,steps)
+            act = self.rt1_tf_inferer.run_inference(steps)
+
+            # image = self.camera.get_picture()
+            # act = self.rt1_jax_inferer.run_inference(image,steps)
 
             self.publish_target_pose_deltas(act)
             actions.append(act)
 
             print(hash(str(act)))
 
-            # time.sleep(self.inference_interval)
+            time.sleep(self.inference_interval)
             steps += 1
             print(f'Step {steps} done.')
         print('DONE RUNNING INFERENCE.')
         # self.draw_plots(actions)
-        # self.draw_pose_history_plots()
+        self.draw_pose_history_plots()
         self.draw_bridge_example_plots(actions)
 
     def draw_plots(self, actions):
@@ -148,7 +151,7 @@ class RtTargetPose(Node):
         fig.text(0.5, 0.97, f'"{self.natural_language_instruction}", Frequency = {round(1/self.inference_interval,1)}Hz', ha='center')
         fig.text(0.5, 0.01, f'{time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())}', ha='center')
 
-        filename = f'inference_{int(time.time())}'
+        filename = f'{self.logfile_name_base}'
 
         plt.subplots_adjust(wspace=0.3, hspace=0.5)
         fig.savefig(f'./data/plots/{filename}.png', dpi=300)
@@ -200,7 +203,7 @@ class RtTargetPose(Node):
         fig.text(0.5, 0.97, f'"{self.natural_language_instruction}", Frequency = {round(1/self.inference_interval,1)}Hz', ha='center')
         fig.text(0.5, 0.01, f'{time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())}', ha='center')
 
-        filename = f'inference_pos_{int(time.time())}'
+        filename = f'{self.logfile_name_base}_pose_history'
 
         plt.subplots_adjust(wspace=0.3, hspace=0.5)
         fig.savefig(f'./data/plots/{filename}.png', dpi=300)
@@ -218,18 +221,37 @@ class RtTargetPose(Node):
 
         # create heatmap
         # Create a 2D histogram (heatmap)
-        heatmap, xedges, yedges = np.histogram2d(x, y, bins=(50, 50))
+        xedges = np.linspace(-0.5, 0.5, 25)
+        yedges = np.linspace(0.3, 0.7, 25)
+
+        plt.figure()
+
+        plt.hist2d(x,y, bins=[np.arange(-0.6,0.6,0.06),np.arange(0.3,0.8,0.025)], cmap='Greens')
+        plt.colorbar(label='Amount of coordinates in bin')
+
+        plt.gca().invert_yaxis()
+
+        # add pig point at coordinate (0,0.3)
+        plt.scatter(0,0.3, color='grey', marker=6, s=100)
+        plt.scatter(0,0.325, color='grey', marker="$Robot Base$", s=900, linewidths=0.2)
+
+
+        # heatmap, xedges, yedges = np.histogram2d(x, y, bins=(xedges, yedges))
 
         # Plot the heatmap
-        plt.figure(figsize=(8, 6))
-        plt.imshow(heatmap.T, origin='lower', cmap='hot', interpolation='nearest')
-        plt.colorbar(label='Density')
+        # plt.figure(figsize=(8, 6))
+        # plt.imshow(heatmap.T, origin='lower', cmap='Greens', interpolation='nearest')
+        
         plt.title('Heatmap of 2D Coordinates')
-        plt.xlabel('X Coordinate')
-        plt.ylabel('Y Coordinate')
+        plt.xlabel('X')
+        plt.ylabel('Y')
 
-        # Save the heatmap as a PNG file
-        plt.savefig('heatmap.png')
+        plt.xticks([-0.6,-0.3,0,0.3,0.6])
+        plt.yticks([0.3,0.4,0.5,0.6,0.7,0.8])
+
+        filename = f'{self.logfile_name_base}_heatmap'
+
+        plt.savefig(f'./data/plots/{filename}.png', dpi=300)
 
         # Show the plot (optional)
 
@@ -265,7 +287,7 @@ class RtTargetPose(Node):
         axs[9].plot([a['gripper_closedness_action'][0] for a in data], color='red')
         axs[9].set_title('gripper_closedness_action_0')
 
-        filename = f'inference_raw_{int(time.time())}'
+        filename = f'{self.logfile_name_base}_model_output'
 
         # plt.subplots_adjust(wspace=0.3, hspace=0.5)
         fig.savefig(f'./data/plots/{filename}.png')
