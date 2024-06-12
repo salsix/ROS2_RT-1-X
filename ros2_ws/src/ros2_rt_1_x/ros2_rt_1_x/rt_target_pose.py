@@ -16,31 +16,24 @@ import tensorflow as tf
 import ros2_rt_1_x.models.rt1_inference as jax_models
 import ros2_rt_1_x.camera as camera
 import ros2_rt_1_x.tf_models.tf_rt1_inference as tf_models
+import ros2_rt_1_x.output_logging as output_log
 
 
 class RtTargetPose(Node):
 
     def __init__(self):
-
+        # disable GPU for tensorflow, since it causes problems with resource allocation together 
+        # with jax. We only use tensorflow for minor tasks, so it doesn't matter.
         tf.config.experimental.set_visible_devices([], "GPU")
 
         super().__init__('rt_target_pose_publisher')
-        self.img_converter = cv_bridge.CvBridge()
-
         self.pose_publisher = self.create_publisher(Pose, 'target_pose', 10)
         self.grip_publisher = self.create_publisher(Float32, 'target_grip', 10)
 
-        # listener for input images
-        self.subscription = self.create_subscription(Image, 'rt_input_image', self.image_listener_callback, 10)
-
-        # self.rt1_inferer = rt1_inference.RT1Inferer()
-        # self.camera = camera.Camera()
+        self.rt1_tf_inferer = tf_models.RT1TensorflowInferer(self.natural_language_instruction)
 
         self.natural_language_instruction = "Place the yellow banana in the pan."
-        self.rt1_tf_inferer = tf_models.RT1TensorflowInferer(self.natural_language_instruction)
-        # self.rt1_jax_inferer = jax_models.RT1Inferer(self.natural_language_instruction)
-
-        self.inference_interval = 2
+        self.inference_interval = 3
 
         self.cur_x = 0.0
         self.cur_y = 0.5
@@ -51,23 +44,11 @@ class RtTargetPose(Node):
         self.cur_grip = 0.02
 
         self.pose_history = []
+        self.pose_history.append([self.cur_x, self.cur_y, self.cur_z, self.cur_roll, self.cur_pitch, self.cur_yaw, self.cur_grip, [0,1,0]])
 
-        # self.camera = camera.Camera()
-
-        self.logfile_name_base = f'inf_{int(time.time())}'
+        self.img_converter = cv_bridge.CvBridge()
 
         self.run_inference()
-
-    def image_listener_callback(self, msg):
-        # self.store_image_msg(msg)
-        self.get_logger().info(f'Received image.')
-
-    # for debugging: store image from ros image message to disk
-    def store_image_msg(self, msg):
-        cv_image = self.img_converter.imgmsg_to_cv2(msg, desired_encoding='passthrough')
-        filename = f'./data/received/test_{int(time.time())}.png'
-        cv2.imwrite(filename, cv_image)
-        self.get_logger().info(f'Stored image to {filename}')
 
     def store_image(self, image):
         filename = f'./data/received/test_{int(time.time())}.png'
@@ -80,7 +61,7 @@ class RtTargetPose(Node):
         print('TOOK ON INIT POSE. RUNNING INFERENCE...')
         actions = []
         steps = 0
-        while steps < 70:
+        while steps < 5:
 
             # image = PIL.Image.open(f'/home/jonathan/Thesis/open_x_embodiment/imgs/bridge/{steps+1}.png')
 
@@ -104,199 +85,13 @@ class RtTargetPose(Node):
             steps += 1
             print(f'Step {steps} done.')
         print('DONE RUNNING INFERENCE.')
-        # self.draw_plots(actions)
-        self.draw_pose_history_plots()
-        self.draw_bridge_example_plots(actions)
 
-    def draw_plots(self, actions):
-        fig, axs = plt.subplots(3, 3)
+        filename = str(int(time.time()))
 
-        axs[0,0].plot([a["world_vector"][0] for a in actions])
-        axs[0,0].set_title('X')
-        axs[0,0].set_ylim([-0.6, 0.6])
-        axs[0,1].plot([a["world_vector"][1] for a in actions])
-        axs[0,1].set_title('Y')
-        axs[0,1].set_ylim([0.3, 0.8])
-        axs[0,2].plot([a["world_vector"][2] for a in actions])
-        axs[0,2].set_title('Z')
-        axs[0,2].set_ylim([0.1, 0.7])
-
-        axs[1,0].plot([a["rotation_delta"][0] for a in actions])
-        axs[1,0].set_title('Roll')
-        axs[1,0].set_ylim([0, 90])
-        axs[1,1].plot([a["rotation_delta"][1] for a in actions])
-        axs[1,1].set_title('Pitch')
-        axs[1,1].set_ylim([0, 90])
-        axs[1,2].plot([a["rotation_delta"][2] for a in actions])
-        axs[1,2].set_title('Yaw')
-        axs[1,2].set_ylim([-20, 200])
-        
-        axs[2,0].plot([a["gripper_closedness_action"][0] for a in actions])
-        axs[2,0].set_title('Gripper')
-        axs[2,0].set_ylim([0.02, 0.08])
-        axs[2,1].plot([a["terminate_episode"][0] for a in actions])
-        axs[2,1].set_title('Terminate')
-        axs[2,1].set_ylim([0, 1])
-
-        # subplots [2,2] is the image ./data/tmp_inference.png
-        axs[2,2].imshow(plt.imread('./data/tmp_inference.png'))
-        axs[2,2].axis('off')
-
-        # dont show subplot [2,2]
-        # axs[2,2].axis('off')
-
-        # print date and time of inference
-        # fig.suptitle(f'\"{self.natural_language_instruction}", Frequency = {round(1/self.inference_interval,1)}s')
-        # second line
-        fig.text(0.5, 0.97, f'"{self.natural_language_instruction}", Frequency = {round(1/self.inference_interval,1)}Hz', ha='center')
-        fig.text(0.5, 0.01, f'{time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())}', ha='center')
-
-        filename = f'{self.logfile_name_base}'
-
-        plt.subplots_adjust(wspace=0.3, hspace=0.5)
-        fig.savefig(f'./data/plots/{filename}.png', dpi=300)
-
-        with open(f'./data/plots/{filename}.csv', 'w') as f:
-            f.write('X,Y,Z,Roll,Pitch,Yaw,Gripper,Terminate,BaseDispl,BaseVertRot\n')
-            for a in actions:
-                f.write(f'{a["world_vector"][0]},{a["world_vector"][1]},{a["world_vector"][2]},{a["rotation_delta"][0]},{a["rotation_delta"][1]},{a["rotation_delta"][2]},{a["gripper_closedness_action"][0]},{a["terminate_episode"]},{a["base_displacement_vector"]},{a["base_displacement_vertical_rotation"]}\n')
-            
-    def draw_pose_history_plots(self):
-        fig, axs = plt.subplots(3, 3)
-
-        # set plot line color to green
-
-
-        axs[0,0].plot([a[0] for a in self.pose_history], color='green')
-        axs[0,0].set_title('X')
-        axs[0,0].set_ylim([-0.6, 0.6])
-        axs[0,1].plot([a[1] for a in self.pose_history], color='green')
-        axs[0,1].set_title('Y')
-        axs[0,1].set_ylim([0.3, 0.8])
-        axs[0,2].plot([a[2] for a in self.pose_history], color='green')
-        axs[0,2].set_title('Z')
-        axs[0,2].set_ylim([0.1, 0.7])
-
-        axs[1,0].plot([a[3] for a in self.pose_history], color='green')
-        axs[1,0].set_title('Roll')
-        axs[1,0].set_ylim([0, 90])
-        axs[1,1].plot([a[4] for a in self.pose_history], color='green')
-        axs[1,1].set_title('Pitch')
-        axs[1,1].set_ylim([0, 90])
-        axs[1,2].plot([a[5] for a in self.pose_history], color='green')
-        axs[1,2].set_title('Yaw')
-        axs[1,2].set_ylim([-20, 200])
-
-        axs[2,0].plot([a[6] for a in self.pose_history], color='green')
-        axs[2,0].set_title('Gripper')
-        axs[2,0].set_ylim([0.02, 0.08])
-        axs[2,1].plot([a[7][0] for a in self.pose_history], color='green')
-        axs[2,1].set_title('Terminate')
-        axs[2,1].set_ylim([0, 1])
-
-        axs[2,2].imshow(plt.imread('./data/tmp_inference.png'))
-        axs[2,2].axis('off')
-
-        # print date and time of inference
-        # fig.suptitle(f'\"{self.natural_language_instruction}", Frequency = {round(1/self.inference_interval,1)}s')
-        # second line
-        fig.text(0.5, 0.97, f'"{self.natural_language_instruction}", Frequency = {round(1/self.inference_interval,1)}Hz', ha='center')
-        fig.text(0.5, 0.01, f'{time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())}', ha='center')
-
-        filename = f'{self.logfile_name_base}_pose_history'
-
-        plt.subplots_adjust(wspace=0.3, hspace=0.5)
-        fig.savefig(f'./data/plots/{filename}.png', dpi=300)
-
-        with open(f'./data/plots/{filename}.csv', 'w') as f:
-            f.write('X,Y,Z,Roll,Pitch,Yaw,Gripper\n')
-            for a in self.pose_history:
-                f.write(f'{a[0]},{a[1]},{a[2]},{a[3]},{a[4]},{a[5]},{a[6]}\n')
-
-        # draw heatmap
-        
-        # get all x and y values
-        x = [a[0] for a in self.pose_history]
-        y = [a[1] for a in self.pose_history]
-
-        # create heatmap
-        # Create a 2D histogram (heatmap)
-        xedges = np.linspace(-0.5, 0.5, 25)
-        yedges = np.linspace(0.3, 0.7, 25)
-
-        plt.figure()
-
-        plt.hist2d(x,y, bins=[np.arange(-0.6,0.6,0.06),np.arange(0.3,0.8,0.025)], cmap='Greens')
-        plt.colorbar(label='Amount of coordinates in bin')
-
-        plt.gca().invert_yaxis()
-
-        # add pig point at coordinate (0,0.3)
-        plt.scatter(0,0.3, color='grey', marker=6, s=100)
-        plt.scatter(0,0.325, color='grey', marker="$Robot Base$", s=900, linewidths=0.2)
-
-
-        # heatmap, xedges, yedges = np.histogram2d(x, y, bins=(xedges, yedges))
-
-        # Plot the heatmap
-        # plt.figure(figsize=(8, 6))
-        # plt.imshow(heatmap.T, origin='lower', cmap='Greens', interpolation='nearest')
-        
-        plt.title('Heatmap of 2D Coordinates')
-        plt.xlabel('X')
-        plt.ylabel('Y')
-
-        plt.xticks([-0.6,-0.3,0,0.3,0.6])
-        plt.yticks([0.3,0.4,0.5,0.6,0.7,0.8])
-
-        filename = f'{self.logfile_name_base}_heatmap'
-
-        plt.savefig(f'./data/plots/{filename}.png', dpi=300)
-
-        # Show the plot (optional)
-
-    def draw_bridge_example_plots(self, act):
-        # show the raw model output
-        data = act
-
-        fig, axs = plt.subplots(1, 10)
-
-        fig.set_size_inches([45, 5])
-        fig.subplots_adjust(left=0.03, right=0.97)
-
-        print(data)
-
-        axs[0].plot([a['terminate_episode'][0] for a in data], color='red')
-        axs[0].set_title('terminate_episode_0')
-        axs[1].plot([a['terminate_episode'][1] for a in data], color='red')
-        axs[1].set_title('terminate_episode_1')
-        axs[2].plot([a['terminate_episode'][2] for a in data], color='red')
-        axs[2].set_title('terminate_episode_2')
-        axs[3].plot([a['world_vector'][0] for a in data], color='red')
-        axs[3].set_title('world_vector_0')
-        axs[4].plot([a['world_vector'][1] for a in data], color='red')
-        axs[4].set_title('world_vector_1')
-        axs[5].plot([a['world_vector'][2] for a in data], color='red')
-        axs[5].set_title('world_vector_2')
-        axs[6].plot([a['rotation_delta'][0] for a in data], color='red')
-        axs[6].set_title('rotation_delta_0')
-        axs[7].plot([a['rotation_delta'][1] for a in data], color='red')
-        axs[7].set_title('rotation_delta_1')
-        axs[8].plot([a['rotation_delta'][2] for a in data], color='red')
-        axs[8].set_title('rotation_delta_2')
-        axs[9].plot([a['gripper_closedness_action'][0] for a in data], color='red')
-        axs[9].set_title('gripper_closedness_action_0')
-
-        filename = f'{self.logfile_name_base}_model_output'
-
-        # plt.subplots_adjust(wspace=0.3, hspace=0.5)
-        fig.savefig(f'./data/plots/{filename}.png')
-
+        output_log.create_full_log(self.pose_history, actions, self.natural_language_instruction, self.inference_interval, filename)
 
 
     def publish_target_pose(self, action):
-        # to see if something changed, print a hash of the action
-        # print("ACTION: " + str(hash(str(action))))
 
         gripper_closedness_action = action["gripper_closedness_action"]
         rotation_delta = action["rotation_delta"]
@@ -331,8 +126,6 @@ class RtTargetPose(Node):
         self.grip_publisher.publish(grip_msg)
 
     def publish_target_pose_deltas(self, action):
-        # to see if something changed, print a hash of the action
-        # print("ACTION: " + str(hash(str(action))))
 
         gripper_closedness_action = action["gripper_closedness_action"]
         rotation_delta = action["rotation_delta"]
@@ -355,9 +148,7 @@ class RtTargetPose(Node):
         self.cur_yaw = min(max(self.cur_yaw, -10.0), 170.0)
         self.cur_grip = min(max(self.cur_grip, 0.02), 0.08)
 
-        # print(f'Publishing target pose: {pos_x}, {pos_y}, {pos_z}, {roll}, {pitch}, {yaw}, {grip}')
         self.get_logger().info(f'Publishing target pose and grip...')
-        # self.get_logger().info(f'pos_x: {pos_x}, pos_y: {pos_y}, pos_z: {pos_z}, roll: {roll}, pitch: {pitch}, yaw: {yaw}, grip: {grip}')
 
         pose_msg = Pose()
         pose_msg.position.x = self.cur_x

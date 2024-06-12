@@ -24,6 +24,7 @@ setup(
             'rt1_inference = ros2_rt_1_x.models.rt1_inference:main',
             'image_publisher = ros2_rt_1_x.image_publisher:main',
             'tf_rt1_inference = ros2_rt_1_x.tf_models.main:main',
+            'pose_control = ros2_rt_1_x.pose_control:main',
         ],
     },
 )
