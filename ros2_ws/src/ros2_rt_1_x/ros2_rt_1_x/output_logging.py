@@ -66,20 +66,21 @@ def draw_heatmap(pose_history, filename_base):
 
     plt.figure()
 
-    plt.hist2d(x,y, bins=[np.arange(-0.6,0.6,0.06),np.arange(0.3,0.8,0.025)], cmap='Greens')
+    plt.hist2d(x,y, bins=[np.arange(-0.6,0.6,0.06),np.arange(0.2,0.7,0.025)], cmap='Greens')
     plt.colorbar(label='Amount of coordinates in bin')
 
     plt.gca().invert_yaxis()
+    plt.gca().invert_xaxis()
 
-    plt.scatter(0,0.3, color='grey', marker=6, s=100)
-    plt.scatter(0,0.325, color='grey', marker="$Robot Base$", s=900, linewidths=0.2)
+    plt.scatter(0,0.2, color='grey', marker=6, s=100)
+    plt.scatter(0,0.225, color='grey', marker="$Robot Base$", s=900, linewidths=0.2)
     
     plt.title('Heatmap of 2D Coordinates')
     plt.xlabel('X')
     plt.ylabel('Y')
 
     plt.xticks([-0.6,-0.3,0,0.3,0.6])
-    plt.yticks([0.3,0.4,0.5,0.6,0.7,0.8])
+    plt.yticks([0.2,0.3,0.4,0.5,0.6,0.7])
 
     filename = f'{filename_base}_heatmap'
 

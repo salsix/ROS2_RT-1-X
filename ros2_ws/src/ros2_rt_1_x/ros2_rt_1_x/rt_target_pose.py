@@ -30,10 +30,11 @@ class RtTargetPose(Node):
         self.pose_publisher = self.create_publisher(Pose, 'target_pose', 10)
         self.grip_publisher = self.create_publisher(Float32, 'target_grip', 10)
 
-        self.rt1_tf_inferer = tf_models.RT1TensorflowInferer(self.natural_language_instruction)
-
         self.natural_language_instruction = "Place the yellow banana in the pan."
         self.inference_interval = 3
+        self.inference_steps = 50
+
+        self.rt1_tf_inferer = tf_models.RT1TensorflowInferer(self.natural_language_instruction)
 
         self.cur_x = 0.0
         self.cur_y = 0.5
@@ -61,7 +62,7 @@ class RtTargetPose(Node):
         print('TOOK ON INIT POSE. RUNNING INFERENCE...')
         actions = []
         steps = 0
-        while steps < 5:
+        while steps < self.inference_steps:
 
             # image = PIL.Image.open(f'/home/jonathan/Thesis/open_x_embodiment/imgs/bridge/{steps+1}.png')
 
@@ -138,10 +139,10 @@ class RtTargetPose(Node):
         self.cur_roll += float(rotation_delta[0])
         self.cur_pitch += float(rotation_delta[1])
         self.cur_yaw += float(rotation_delta[2])
-        self.cur_grip += float(gripper_closedness_action[0])
+        self.cur_grip = float(gripper_closedness_action[0])
 
         self.cur_x = min(max(self.cur_x, -0.5), 0.5)
-        self.cur_y = min(max(self.cur_y, 0.3), 0.8)
+        self.cur_y = min(max(self.cur_y, 0.2), 0.7)
         self.cur_z = min(max(self.cur_z, 0.0), 0.4)
         self.cur_roll = min(max(self.cur_roll, 0.0), 90.0)
         self.cur_pitch = min(max(self.cur_pitch, 0.0), 90.0)
@@ -161,6 +162,7 @@ class RtTargetPose(Node):
 
         grip_msg = Float32()
         grip_msg.data = self.cur_grip
+        print('GRIPPER CLOSEDNESS: ', self.cur_grip)
 
         self.pose_publisher.publish(pose_msg)
         self.grip_publisher.publish(grip_msg)
