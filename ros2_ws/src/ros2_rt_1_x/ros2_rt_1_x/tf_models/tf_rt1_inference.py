@@ -69,6 +69,21 @@ class RT1TensorflowInferer:
         self.policy_state = policy_step.state
 
         return rescale_for_umi(action)
+    
+    def run_bridge_inference(self, i):
+        image = resize(Image.open(f'/home/jonathan/Thesis/open_x_embodiment/imgs/bridge/{i}.png').convert('RGB'))
+        image = tf.convert_to_tensor(np.array(image))
+
+        self.observation['image'] = image
+        self.observation['natural_language_embedding'] = self.embed(["Place the can to the left of the pot."])[0]
+
+        tfa_time_step = ts.transition(self.observation, reward=np.zeros((), dtype=np.float32))
+
+        policy_step = self.tfa_policy.action(tfa_time_step, self.policy_state)
+        action = policy_step.action
+        self.policy_state = policy_step.state
+
+        return rescale_for_umi(action)
 
 def resize(image):
   image = tf.image.resize_with_pad(image, target_width=320, target_height=256)

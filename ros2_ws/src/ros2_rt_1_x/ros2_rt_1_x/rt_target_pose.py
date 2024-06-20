@@ -31,10 +31,11 @@ class RtTargetPose(Node):
         self.grip_publisher = self.create_publisher(Float32, 'target_grip', 10)
 
         self.natural_language_instruction = "Place the yellow banana in the pan."
-        self.inference_interval = 3
-        self.inference_steps = 50
+        self.inference_interval = 0.1
+        self.inference_steps = 38
 
-        self.rt1_tf_inferer = tf_models.RT1TensorflowInferer(self.natural_language_instruction)
+        # self.rt1_inferer = tf_models.RT1TensorflowInferer(self.natural_language_instruction)
+        self.rt1_inferer = jax_models.RT1Inferer(self.natural_language_instruction)
 
         self.cur_x = 0.0
         self.cur_y = 0.5
@@ -72,7 +73,8 @@ class RtTargetPose(Node):
             # self.get_logger().info(f'Action: {action}')
             # self.publish_target_pose(action)
 
-            act = self.rt1_tf_inferer.run_inference(steps)
+            # act = self.rt1_inferer.run_inference(steps)
+            act = self.rt1_inferer.run_bridge_inference(steps)
 
             # image = self.camera.get_picture()
             # act = self.rt1_jax_inferer.run_inference(image,steps)

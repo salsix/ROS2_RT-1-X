@@ -12,7 +12,7 @@ import tensorflow_hub as hub
 from collections import deque
 
 import ros2_rt_1_x.models.rt1 as rt1
-# import ros2_rt_1_x.camera as camera
+import ros2_rt_1_x.camera as camera
 import time
 import cv2
 
@@ -22,7 +22,8 @@ class RT1Policy:
 
   def __init__(
       self,
-      checkpoint_path="/home/jonathan/Thesis/ROS2_RT-1-X/ros2_ws/src/ros2_rt_1_x/ros2_rt_1_x/checkpoints/rt_1_x_jax/checkpoint",
+      checkpoint_path="/home/jonathan/Thesis/ROS2_RT-1-X/ros2_ws/src/ros2_rt_1_x/ros2_rt_1_x/checkpoints/rt_1_x_jax/b321733791_75882326_000900000",
+      # checkpoint_path="/home/jonathan/Thesis/open_x_embodiment/custom_rt1x_checkpoint_epoch1",
       model=rt1.RT1(),
       variables=None,
       seqlen=15,
@@ -161,7 +162,7 @@ class RT1Inferer:
 
   def __init__(self, natural_language_instruction):
     """Initializes the inferer."""
-    # self.cam = camera.Camera()
+    self.cam = camera.Camera()
 
     tf.config.experimental.set_visible_devices([], "GPU")
 
@@ -194,19 +195,19 @@ class RT1Inferer:
 
     print("RT1Inferer initialized.")
 
-  def run_inference(self,img,i):
+  def run_inference(self,i):
     """Outputs the action given observation from the env."""
 
-    # image = Image.fromarray(cv2.cvtColor(self.cam.get_picture(), cv2.COLOR_BGRA2RGB)).convert('RGB')
+    image = Image.fromarray(cv2.cvtColor(self.cam.get_picture(), cv2.COLOR_BGRA2RGB)).convert('RGB')
         
-    # # save image for debugging
-    # if i == 0:
-    #     image.save(f'./data/tmp_inference.png')
+    # save image for debugging
+    if i == 0:
+        image.save(f'./data/tmp_inference.png')
 
     # image = tf.image.resize_with_pad(image, target_width=300, target_height=300)
     # image = tf.cast(image, tf.uint8)
 
-    image = preprocess_image(img)
+    image = preprocess_image(image)
 
     # if this is the first step (the queue is empty), fill all 15 places of the queue with the new image
     if len(self.img_queue) == 0:
@@ -229,6 +230,31 @@ class RT1Inferer:
 
     observation = {
       'image': img_array,
+      'natural_language_embedding': np.array(embeddings),
+    }
+
+    return self.policy.action(observation)
+  
+  def run_bridge_inference(self, i):
+    image = Image.open(f'/home/jonathan/Thesis/open_x_embodiment/imgs/bridge/{i+1}.png').convert('RGB')
+    image = preprocess_image(image)
+
+    # if this is the first step (the queue is empty), fill all 15 places of the queue with the new image
+    if len(self.img_queue) == 0:
+      self.img_queue.extend([image for j in range(0,15)])
+    else:
+      self.img_queue.append(image)
+
+    img_array = np.array(self.img_queue)
+
+    embeddings = [jnp.ones((512,)) for _ in range(15)]
+    embeddings[-1] = self.embed(["Place the can to the left of the pot."])[0]
+
+    # embeddings = [self.language_embedding for i in range(0,15)]
+
+    observation = {
+      # 'image': img_array,
+      'image': np.random.rand(15, 300, 300, 3),
       'natural_language_embedding': np.array(embeddings),
     }
 

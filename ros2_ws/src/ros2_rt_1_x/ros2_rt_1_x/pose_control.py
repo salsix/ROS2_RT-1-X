@@ -8,12 +8,14 @@ import time
 import pygame
 import sys
 
+import ros2_rt_1_x.create_episode as create_episode
+
 # MOVEMENT LIMITS
 X_MIN = -0.3
 X_MAX = 0.3
 Y_MIN = 0.4
 Y_MAX = 0.7
-Z_MIN = -15.0
+Z_MIN = 0.2
 Z_MAX = 0.7
 O_X_MIN = 45.0
 O_X_MAX = 135.0
@@ -46,6 +48,8 @@ class PoseControl(Node):
         self.screen = pygame.display.set_mode((100, 100))
         self.timer = self.create_timer(1, self.main)
         self.joysticks = {}
+
+        self.episode_logger = create_episode.EpisodeLogger(self.current_pose, self.current_grip)
 
     def enforce_limits(self):
         self.current_pose.position.x = max(X_MIN, min(X_MAX, self.current_pose.position.x))
@@ -100,6 +104,13 @@ class PoseControl(Node):
 
             move = False
             if joy:
+                # terminate episode
+                if joy.get_button(0) == 1:
+                    self.episode_logger.log(self.current_pose, self.current_grip, terminate=True)
+                    self.episode_logger.save()
+                    print('Episode saved.')
+                    break
+
                 # move grip
                 if joy.get_button(6) == 1:
                     move = True
@@ -160,6 +171,11 @@ class PoseControl(Node):
                     self.get_logger().info(f'Published target pose: {self.current_pose}')
                     self.get_logger().info(f'Published target grip: {self.current_grip}')
                     move = False
+
+                # every 0.3 seconds, log the current pose
+                if time.time() - self.episode_logger.last_log_time > 0.3:
+                    self.episode_logger.log(self.current_pose, self.current_grip)
+                    self.episode_logger.last_log_time = time.time()
 
                 time.sleep(0.1)
 
