@@ -13,7 +13,7 @@ import ros2_rt_1_x.create_episode as create_episode
 # MOVEMENT LIMITS
 X_MIN = -0.3
 X_MAX = 0.3
-Y_MIN = 0.4
+Y_MIN = 0.2
 Y_MAX = 0.7
 Z_MIN = 0.2
 Z_MAX = 0.7
@@ -42,7 +42,7 @@ class PoseControl(Node):
         self.current_pose.orientation.y = 0.0
         self.current_pose.orientation.z = 0.0
         self.current_pose.orientation.w = 1.0
-        self.current_grip.data = 0.05
+        self.current_grip.data = 0.02
 
         pygame.init()
         self.screen = pygame.display.set_mode((100, 100))
@@ -63,6 +63,9 @@ class PoseControl(Node):
     def main(self):
         self.timer.cancel()
         joy = self.joysticks.get(0)
+
+        self.pose_publisher.publish(self.current_pose)
+        self.grip_publisher.publish(self.current_grip)
 
         done = False
         while not done:
@@ -100,14 +103,19 @@ class PoseControl(Node):
                         self.current_pose.position.z -= 0.1
 
                     self.pose_publisher.publish(self.current_pose)
-                    self.get_logger().info(f'Published target pose: {self.current_pose}')
+                    # self.get_logger().info(f'Published target pose: {self.current_pose}')
 
             move = False
             if joy:
+                # start episode
+                if joy.get_button(9) == 1:
+                    self.episode_logger.episode_started = True
+                    print('Episode started.')
+
                 # terminate episode
-                if joy.get_button(0) == 1:
+                if joy.get_button(8) == 1:
                     self.episode_logger.log(self.current_pose, self.current_grip, terminate=True)
-                    self.episode_logger.save()
+                    self.episode_logger.stop_and_save(f'epi_{int(time.time())}')
                     print('Episode saved.')
                     break
 
@@ -139,13 +147,13 @@ class PoseControl(Node):
                 pitch = joy.get_axis(2)
                 if abs(pitch) > 0.05:
                     move = True
-                    self.current_pose.orientation.y += pitch * 1
+                    self.current_pose.orientation.y += pitch * 2
 
                 # move yaw
                 yaw = joy.get_axis(3)
                 if abs(yaw) > 0.05:
                     move = True
-                    self.current_pose.orientation.x += yaw * 1
+                    self.current_pose.orientation.x += yaw * 2
 
 
 
@@ -168,12 +176,12 @@ class PoseControl(Node):
                     self.enforce_limits()
                     self.pose_publisher.publish(self.current_pose)
                     self.grip_publisher.publish(self.current_grip)
-                    self.get_logger().info(f'Published target pose: {self.current_pose}')
-                    self.get_logger().info(f'Published target grip: {self.current_grip}')
+                    # self.get_logger().info(f'Published target pose: {self.current_pose}')
+                    # self.get_logger().info(f'Published target grip: {self.current_grip}')
                     move = False
 
-                # every 0.3 seconds, log the current pose
-                if time.time() - self.episode_logger.last_log_time > 0.3:
+                # every second, log the current pose
+                if (self.episode_logger.episode_started) and time.time() - self.episode_logger.last_log_time > 1:
                     self.episode_logger.log(self.current_pose, self.current_grip)
                     self.episode_logger.last_log_time = time.time()
 
