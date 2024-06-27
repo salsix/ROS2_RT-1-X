@@ -131,7 +131,7 @@ def rescale_for_umi(action):
     umi_roll = rescale_dimension(roll, -abs_rot, abs_rot, -45.0, 45.0) # 90
     umi_pitch = rescale_dimension(pitch, -abs_rot, abs_rot, -45.0, 45.0) # 90
     umi_yaw = rescale_dimension(yaw, -abs_rot, abs_rot, -80.0, 80.0) # 220
-    umi_grip = rescale_dimension(grip, -1, 1, 0.02, 0.08)
+    umi_grip = rescale_dimension(grip, 1, -1, 0.02, 0.08)
 
     # print(f'2. pos_x: {umi_pos_x}, pos_y: {umi_pos_y}, pos_z: {umi_pos_z}')
 

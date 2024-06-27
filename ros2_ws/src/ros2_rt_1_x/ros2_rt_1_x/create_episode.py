@@ -40,15 +40,17 @@ class EpisodeLogger:
     def stop_and_save(self, filename):
         self.episode_started = False
         self.log(self.current_pose, self.current_grip, terminate=True)
-        # np.save(f'./episodes/{filename}.npy', self.episode)
-        np.save(f'./episodes/test_epi.npy', self.episode)
+        np.save(f'./episodes/{filename}.npy', self.episode)
+        # np.save(f'./episodes/test_epi.npy', self.episode)
+        self.reset()
 
     def reset(self):
         self.episode = []
 
     def _take_picture(self):
         image = Image.fromarray(cv2.cvtColor(self.camera.get_picture(), cv2.COLOR_BGRA2RGB)).convert('RGB')
-        image = tf.image.resize(image, (300, 300))
+        print(f'Image shape: {image.size}')
+        # image = tf.image.resize(image, (300, 300))
         # image = np.array(image, dtype=np.float32) / 255.0  # Normalize to [0,1]
         image = np.asarray(image, dtype=np.uint8)
         return image

@@ -30,8 +30,8 @@ class RtTargetPose(Node):
         self.pose_publisher = self.create_publisher(Pose, 'target_pose', 10)
         self.grip_publisher = self.create_publisher(Float32, 'target_grip', 10)
 
-        self.natural_language_instruction = "Place the yellow banana in the pan."
-        self.inference_interval = 0.1
+        self.natural_language_instruction = "Pick up the yellow banana."
+        self.inference_interval = 3.0
         self.inference_steps = 38
 
         # self.rt1_inferer = tf_models.RT1TensorflowInferer(self.natural_language_instruction)
@@ -39,10 +39,10 @@ class RtTargetPose(Node):
 
         self.cur_x = 0.0
         self.cur_y = 0.5
-        self.cur_z = 0.3
+        self.cur_z = 0.5
         self.cur_roll = 0.0
-        self.cur_pitch = 90.0
-        self.cur_yaw = 0.0
+        self.cur_pitch = 0.0
+        self.cur_yaw = 90.0
         self.cur_grip = 0.02
 
         self.pose_history = []
@@ -73,8 +73,8 @@ class RtTargetPose(Node):
             # self.get_logger().info(f'Action: {action}')
             # self.publish_target_pose(action)
 
-            # act = self.rt1_inferer.run_inference(steps)
-            act = self.rt1_inferer.run_bridge_inference(steps)
+            act = self.rt1_inferer.run_inference(steps)
+            # act = self.rt1_inferer.run_bridge_inference(steps)
 
             # image = self.camera.get_picture()
             # act = self.rt1_jax_inferer.run_inference(image,steps)
@@ -145,7 +145,7 @@ class RtTargetPose(Node):
 
         self.cur_x = min(max(self.cur_x, -0.5), 0.5)
         self.cur_y = min(max(self.cur_y, 0.2), 0.7)
-        self.cur_z = min(max(self.cur_z, 0.0), 0.4)
+        self.cur_z = min(max(self.cur_z, 0.2), 0.6)
         self.cur_roll = min(max(self.cur_roll, 0.0), 90.0)
         self.cur_pitch = min(max(self.cur_pitch, 0.0), 90.0)
         self.cur_yaw = min(max(self.cur_yaw, -10.0), 170.0)

@@ -119,4 +119,55 @@ def draw_model_output(actions, filename_base):
 
     fig.savefig(f'./data/plots/{filename}.png')
 
+def draw_compare_model_output(actions1, actions2, filename_base):
+     # same as draw_model_output, but it draws two actions in different colors to compare
+    data1 = actions1
+    data2 = actions2
+
+    fig, axs = plt.subplots(1, 10)
+
+    fig.set_size_inches([45, 5])
+    fig.subplots_adjust(left=0.03, right=0.97)
+
+    axs[0].plot([a['terminate_episode'][0] for a in data1], color='red')
+    axs[0].plot([a['terminate_episode'][0] for a in data2], color='blue')
+    axs[0].set_title('terminate_episode_0')
+    axs[1].plot([a['terminate_episode'][1] for a in data1], color='red')
+    axs[1].plot([a['terminate_episode'][1] for a in data2], color='blue')
+    axs[1].set_title('terminate_episode_1')
+    axs[2].plot([a['terminate_episode'][2] for a in data1], color='red')
+    axs[2].plot([a['terminate_episode'][2] for a in data2], color='blue')
+    axs[2].set_title('terminate_episode_2')
+    axs[3].plot([a['world_vector'][0] for a in data1], color='red')
+    axs[3].plot([a['world_vector'][0] for a in data2], color='blue')
+    axs[3].set_title('world_vector_0')
+    axs[4].plot([a['world_vector'][1] for a in data1], color='red')
+    axs[4].plot([a['world_vector'][1] for a in data2], color='blue')
+    axs[4].set_title('world_vector_1')
+    axs[5].plot([a['world_vector'][2] for a in data1], color='red')
+    axs[5].plot([a['world_vector'][2] for a in data2], color='blue')
+    axs[5].set_title('world_vector_2')
+    axs[6].plot([a['rotation_delta'][0] for a in data1], color='red')
+    axs[6].plot([a['rotation_delta'][0] for a in data2], color='blue')
+    axs[6].set_title('rotation_delta_0')
+    axs[7].plot([a['rotation_delta'][1] for a in data1], color='red')
+    axs[7].plot([a['rotation_delta'][1] for a in data2], color='blue')
+    axs[7].set_title('rotation_delta_1')
+    axs[8].plot([a['rotation_delta'][2] for a in data1], color='red')
+    axs[8].plot([a['rotation_delta'][2] for a in data2], color='blue')
+    axs[8].set_title('rotation_delta_2')
+    axs[9].plot([a['gripper_closedness_action'][0] for a in data1], color='red')
+    axs[9].plot([a['gripper_closedness_action'][0] for a in data2], color='blue')
+    axs[9].set_title('gripper_closedness_action_0')
+
+    # add labels so we know which is what color
+    fig.text(0.5, 0.97, f'Red: Inference, Blue: Ground Truth', ha='center')
+
+    filename = f'{filename_base}_compare_model_output'
+
+    fig.savefig(f'./data/plots/{filename}.png')
+
+
+
+
 

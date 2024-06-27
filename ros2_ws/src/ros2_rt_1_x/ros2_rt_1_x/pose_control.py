@@ -11,8 +11,8 @@ import sys
 import ros2_rt_1_x.create_episode as create_episode
 
 # MOVEMENT LIMITS
-X_MIN = -0.3
-X_MAX = 0.3
+X_MIN = -0.5
+X_MAX = 0.5
 Y_MIN = 0.2
 Y_MAX = 0.7
 Z_MIN = 0.2
@@ -132,16 +132,16 @@ class PoseControl(Node):
                 y = joy.get_axis(1)
                 if abs(x) > 0.05 or abs(y) > 0.05:
                     move = True
-                    self.current_pose.position.x += x * -0.01
-                    self.current_pose.position.y += y * 0.01
+                    self.current_pose.position.x += x * -0.02
+                    self.current_pose.position.y += y * 0.02
 
                 # move z
                 if joy.get_button(4) == 1:
                     move = True
-                    self.current_pose.position.z += 0.01
+                    self.current_pose.position.z += 0.02
                 elif joy.get_button(5) == 1:
                     move = True
-                    self.current_pose.position.z -= 0.01
+                    self.current_pose.position.z -= 0.02
 
                 # move pitch
                 pitch = joy.get_axis(2)
@@ -181,11 +181,11 @@ class PoseControl(Node):
                     move = False
 
                 # every second, log the current pose
-                if (self.episode_logger.episode_started) and time.time() - self.episode_logger.last_log_time > 1:
+                if (self.episode_logger.episode_started):
                     self.episode_logger.log(self.current_pose, self.current_grip)
                     self.episode_logger.last_log_time = time.time()
 
-                time.sleep(0.1)
+                time.sleep(0.3)
 
 
 

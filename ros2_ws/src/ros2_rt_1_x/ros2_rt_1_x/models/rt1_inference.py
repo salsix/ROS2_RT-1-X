@@ -22,8 +22,8 @@ class RT1Policy:
 
   def __init__(
       self,
-      checkpoint_path="/home/jonathan/Thesis/ROS2_RT-1-X/ros2_ws/src/ros2_rt_1_x/ros2_rt_1_x/checkpoints/rt_1_x_jax/b321733791_75882326_000900000",
-      # checkpoint_path="/home/jonathan/Thesis/open_x_embodiment/custom_rt1x_checkpoint_epoch1",
+      # checkpoint_path="/home/jonathan/Thesis/ROS2_RT-1-X/ros2_ws/src/ros2_rt_1_x/ros2_rt_1_x/checkpoints/rt_1_x_jax/b321733791_75882326_000900000",
+      checkpoint_path="/home/jonathan/Thesis/open_x_embodiment/custom_rt1x_checkpoint_epoch12",
       model=rt1.RT1(),
       variables=None,
       seqlen=15,
@@ -152,10 +152,14 @@ def load_and_preprocess_image(image_path):
 def preprocess_image(image):
     if isinstance(image, np.ndarray):
         image = Image.fromarray(image)
-    image = image.convert('RGB')
-    image = tf.image.resize(image, (300, 300))
-    image = np.array(image, dtype=np.float32) / 255.0  # Normalize to [0,1]
-    return image
+    # image = image.convert('RGB')
+    image = tf.image.resize_with_pad(
+      image,
+      target_width=320,
+      target_height=256,
+    )
+    image = tf.image.resize(image, size=(300, 300))
+    return image.numpy()
 
 class RT1Inferer:
   """Runs inference with the RT-1 model."""
@@ -192,6 +196,7 @@ class RT1Inferer:
     self.language_instruction = natural_language_instruction
     self.language_embedding = self.embed([self.language_instruction])[0]
     self.img_queue = deque(maxlen=15)
+    self.emb_queue = deque(maxlen=15)
 
     print("RT1Inferer initialized.")
 
@@ -204,33 +209,21 @@ class RT1Inferer:
     if i == 0:
         image.save(f'./data/tmp_inference.png')
 
-    # image = tf.image.resize_with_pad(image, target_width=300, target_height=300)
-    # image = tf.cast(image, tf.uint8)
-
     image = preprocess_image(image)
 
-    # if this is the first step (the queue is empty), fill all 15 places of the queue with the new image
     if len(self.img_queue) == 0:
-      self.img_queue.extend([image for j in range(0,15)])
-    else:
-      self.img_queue.append(image)
+      self.img_queue.extend([jnp.zeros((300,300,3)) for j in range(0,15)])
+      self.emb_queue.extend([jnp.zeros((512,)) for j in range(0,15)])
 
-    # # save all images from the queue to a folder
-    # for i, img in enumerate(self.img_queue):
-    #   img_path = f"./data/queue_img_{i}.jpg"
-    #   Image.fromarray((img * 255).astype(np.uint8)).save(img_path)
+    self.img_queue.append(image)
+    self.emb_queue.append(self.language_embedding)
 
     img_array = np.array(self.img_queue)
-
-    embeddings = [jnp.ones((512,)) for _ in range(15)]
-    embeddings[-1] = self.language_embedding
-
-    # embeddings = [self.language_embedding for i in range(0,15)]
-
+    emb_array = np.array(self.emb_queue)
 
     observation = {
       'image': img_array,
-      'natural_language_embedding': np.array(embeddings),
+      'natural_language_embedding': emb_array,
     }
 
     return self.policy.action(observation)
@@ -259,6 +252,54 @@ class RT1Inferer:
     }
 
     return self.policy.action(observation)
+  
+  def run_umi_mock_inference(self, img, step_index):
+    image = preprocess_image(img)
+    emb = self.embed(["Place the can to the left of the pot."])[0]
+
+    if len(self.img_queue) == 0:
+      self.img_queue.extend([jnp.zeros((300,300,3)) for j in range(0,15)])
+      self.emb_queue.extend([jnp.zeros((512,)) for j in range(0,15)])
+
+    self.img_queue.append(image)
+    self.emb_queue.append(emb)
+    # self.emb_queue.popleft()
+    # self.emb_queue.appendleft(jnp.ones(512,))
+    # queues implemented as deques with maxlen 15, so no need to remove
+
+    # print(self._print_emb_queue_format(self.emb_queue))
+
+    img_array = np.array(self.img_queue)
+    emb_array = np.array(self.emb_queue)
+
+    observation = {
+      'image': img_array,
+      'natural_language_embedding': emb_array,
+    }
+
+    return self.policy.action(observation)
+  
+  def _print_img_queue_format(self, queue):
+    zeros = np.zeros_like(queue[0])
+    format_str = ""
+    for i, img in enumerate(queue):
+      if np.array_equal(img, zeros):
+        format_str += f",zero"
+      else:
+        format_str += f",img"
+    return format_str
+  
+  def _print_emb_queue_format(self, queue):
+    ones = jnp.ones(512,)
+    format_str = ""
+    for i, emb in enumerate(queue):
+      if np.array_equal(emb, ones):
+        format_str += f",one"
+      else:
+        format_str += f",emb"
+    return format_str
+    
+    
 
 
 def main():
